@@ -1,11 +1,28 @@
-# Support assistant
+# Zepto Data & AI Platform Capstone
 
-Install `pip install -r requirements.txt`, then run `uvicorn main:app --reload --port 7860`. Mock mode is the default (`MOCK_LLM` unset or `1`); it makes no LLM network calls. Try:
+This repository contains three internally-linked modules for the Zepto Data & AI Platform Capstone.
 
-`curl -X POST http://127.0.0.1:7860/ask -H "Content-Type: application/json" -d '{"query":"What is the delivery fee?"}'`
+## Setup and Run Instructions
+1. **Install dependencies:** `pip install -r requirements.txt`
+2. **Module 1 (Data Pipeline):** Run `python data_pipeline/pipeline.py` or execute the notebook.
+3. **Module 2 (Analytics):** Execute `analytics/analysis.py` or the notebooks to generate EDA and the fitted joblib pipeline.
+4. **Module 3 (Support Assistant):** Navigate to `support_assistant/` and run `uvicorn main:app --port 8000`. 
 
-Expected raw JSON is shaped as `{"answer":"Based on the retrieved context: Zepto delivers ...","sources":["doc_01",...],"confidence":1.0}`. For `{"query":"What is the capital of France?"}`, it is `{"answer":"I can only answer questions about Zepto policies right now.","sources":[],"confidence":1.0}`.
+## Module 1 Notes
+* **Currency Baseline:** The fixed currency conversion rate used is exactly **1 GBP = 105.50 INR**.
+* **Missing values:** Handled via median imputation for numeric fields and row dropping for missing text, as documented in the scripts.
 
-Architecture: **ingestion** reads the eight `docs/doc_*.txt` files in `ingest`; **embedding** uses local `all-MiniLM-L6-v2`; **storage/retrieval** uses the persistent Chroma collection `zepto_policies`, queried by the `retrieve_and_answer` LangGraph node; **generation** occurs in `retrieve_and_answer` or `direct_answer`. `classify_intent` conditionally routes between them. The default mock branches use a keyword classifier and deterministic canned responses; the optional `MOCK_LLM=0` branches use the included role/context/task/format/length prompt and retry validation hook.
+## Module 2 Notes
+* See `analytics/results.md` for full EDA interpretations, correlation conclusions, and the final model evaluation tables.
+* The best pipeline is saved as `artifacts/best_pipeline.joblib`.
 
-Build locally with `docker build -t zepto-assistant .`, then `docker run -p 7860:7860 zepto-assistant`.
+## Module 3 Notes (RAG Architecture)
+* **Ingestion & Embedding:** The 8 text documents are chunked and embedded locally using `sentence-transformers` (`all-MiniLM-L6-v2`) and stored in a local `chromadb` collection.
+* **Routing:** A LangGraph node (`classify_intent`) routes the query based on keywords.
+* **Retrieval & Generation:** 
+  * Policy questions route to `retrieve_and_answer`, which queries ChromaDB via cosine similarity. 
+  * General questions route to `direct_answer`.
+  * **MOCK_LLM Branching:** Under the default mock state, no LLM API is called. `retrieve_and_answer` returns a deterministic templated string using the top chunk, and `direct_answer` returns a canned fallback string.
+
+### Example Calls (MOCK_LLM=1)
+**Policy Question (Retrieval):**
